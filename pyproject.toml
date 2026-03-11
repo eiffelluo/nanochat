@@ -26,6 +26,9 @@ dependencies = [
     "zstandard>=0.25.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["nanochat*", "scripts*", "tasks*"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
