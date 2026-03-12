@@ -307,10 +307,11 @@ def execute_code(
         'hello world\\n'
     """
 
-    manager = multiprocessing.Manager()
+    ctx = multiprocessing.get_context("fork")
+    manager = ctx.Manager()
     result_dict = manager.dict()
 
-    p = multiprocessing.Process(
+    p = ctx.Process(
         target=_unsafe_execute,
         args=(code, timeout, maximum_memory_bytes, result_dict)
     )
