@@ -59,7 +59,7 @@ curl -L -o "$NANOCHAT_BASE_DIR/identity_conversations.jsonl" \
 python -m scripts.chat_sft \
     --device-type=mps \
     --max-seq-len=512 \
-    --device-batch-size=16 \
+    --device-batch-size=8 \
     --total-batch-size=16384 \
     --eval-every=200 \
     --eval-tokens=524288 \
