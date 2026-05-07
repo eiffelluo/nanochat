@@ -67,7 +67,8 @@ python -m scripts.base_train \
     --depth=$DEPTH \
     --target-param-data-ratio=8.25 \
     --device-batch-size=$DEVICE_BS \
-    --run=$WANDB_RUN
+    --run=$WANDB_RUN \
+    --save-every=100
 
 python -m scripts.base_eval \
     --device-batch-size=$DEVICE_BS
