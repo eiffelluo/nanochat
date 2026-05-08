@@ -1,3 +1,6 @@
+#!/bin/bash
+# 在gpu 租用模式下，可以以便宜的无卡模式初始化环境和数据下载，节约成本
+
 export OMP_NUM_THREADS=1
 export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
 mkdir -p $NANOCHAT_BASE_DIR
@@ -15,4 +18,4 @@ uv sync --extra gpu
 source .venv/bin/activate
 
 # speedrun.sh 规模
-python -m scripts.prefetch_data --num-shards 370
+python -m scripts.prefetch_data --num-shards 370 --num-workers 2
