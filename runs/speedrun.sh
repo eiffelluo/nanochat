@@ -40,7 +40,7 @@ if [ -z "$WANDB_RUN" ]; then
 fi
 
 DEVICE_BATCH_SIZE=${DEVICE_BATCH_SIZE:-8}
-NPROC_PER_NODE=${NPROC_PER_NODE:-1}
+NPROC_PER_NODE=${NPROC_PER_NODE:-4}
 
 # -----------------------------------------------------------------------------
 # During the course of the run, we will be writing markdown reports to the report/
