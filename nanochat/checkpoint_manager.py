@@ -39,7 +39,26 @@ def _patch_missing_keys(model_data, model_config):
         model_data["x0_lambdas"] = torch.zeros(n_layer)
         log0(f"Patching missing x0_lambdas in model data to 0.0")
 
-def save_checkpoint(checkpoint_dir, step, model_data, optimizer_data, meta_data, rank=0):
+def _cleanup_old_checkpoints(checkpoint_dir, keep_last):
+    """Delete all but the most recent `keep_last` checkpoint steps."""
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, "model_*.pt"))
+    steps = sorted(
+        int(os.path.basename(f).split("_")[-1].split(".")[0])
+        for f in checkpoint_files
+    )
+    if len(steps) <= keep_last:
+        return
+    for old_step in steps[:len(steps) - keep_last]:
+        for pattern in [
+            f"model_{old_step:06d}.pt",
+            f"meta_{old_step:06d}.json",
+            f"optim_{old_step:06d}_rank*.pt",
+        ]:
+            for f in glob.glob(os.path.join(checkpoint_dir, pattern)):
+                os.remove(f)
+                logger.info(f"Cleaned up old checkpoint file: {f}")
+
+def save_checkpoint(checkpoint_dir, step, model_data, optimizer_data, meta_data, rank=0, keep_last=0):
     if rank == 0:
         os.makedirs(checkpoint_dir, exist_ok=True)
         # Save the model state parameters
@@ -57,6 +76,9 @@ def save_checkpoint(checkpoint_dir, step, model_data, optimizer_data, meta_data,
         optimizer_path = os.path.join(checkpoint_dir, f"optim_{step:06d}_rank{rank:d}.pt")
         torch.save(optimizer_data, optimizer_path)
         logger.info(f"Saved optimizer state to: {optimizer_path}")
+    # Rolling cleanup: keep only the most recent N checkpoints (rank 0 only)
+    if rank == 0 and keep_last > 0:
+        _cleanup_old_checkpoints(checkpoint_dir, keep_last)
 
 def load_checkpoint(checkpoint_dir, step, device, load_optimizer=False, rank=0):
     # Load the model state
