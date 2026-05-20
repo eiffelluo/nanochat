@@ -39,8 +39,8 @@ if [ -z "$WANDB_RUN" ]; then
     WANDB_RUN=dummy
 fi
 
-DEVICE_BATCH_SIZE=${DEVICE_BATCH_SIZE:-8}
-NPROC_PER_NODE=${NPROC_PER_NODE:-4}
+DEVICE_BATCH_SIZE=${DEVICE_BATCH_SIZE:-16}
+NPROC_PER_NODE=${NPROC_PER_NODE:-8}
 
 # -----------------------------------------------------------------------------
 # During the course of the run, we will be writing markdown reports to the report/
