@@ -23,17 +23,17 @@ def adamw_step_fused(
     grad: Tensor,           # (32768, 768) - gradient, same shape as p
     exp_avg: Tensor,        # (32768, 768) - first moment, same shape as p
     exp_avg_sq: Tensor,     # (32768, 768) - second moment, same shape as p
-    step_t: Tensor,         # () - 0-D CPU tensor, step count
-    lr_t: Tensor,           # () - 0-D CPU tensor, learning rate
-    beta1_t: Tensor,        # () - 0-D CPU tensor, beta1
-    beta2_t: Tensor,        # () - 0-D CPU tensor, beta2
-    eps_t: Tensor,          # () - 0-D CPU tensor, epsilon
-    wd_t: Tensor,           # () - 0-D CPU tensor, weight decay
+    step_t: Tensor,         # () - 0-D tensor, step count
+    lr_t: Tensor,           # () - 0-D tensor, learning rate
+    beta1_t: Tensor,        # () - 0-D tensor, beta1
+    beta2_t: Tensor,        # () - 0-D tensor, beta2
+    eps_t: Tensor,          # () - 0-D tensor, epsilon
+    wd_t: Tensor,           # () - 0-D tensor, weight decay
 ) -> None:
     """
     Fused AdamW step: weight_decay -> momentum_update -> bias_correction -> param_update
     All in one compiled graph to eliminate Python overhead between ops.
-    The 0-D CPU tensors avoid recompilation when hyperparameter values change.
+    The 0-D tensors avoid recompilation when hyperparameter values change.
     """
     # Weight decay (decoupled, applied before the update)
     p.mul_(1 - lr_t * wd_t)
@@ -93,10 +93,10 @@ def muon_step_fused(
     stacked_params: Tensor,         # (12, 768, 3072) - stacked parameters
     momentum_buffer: Tensor,        # (12, 768, 3072) - first moment buffer
     second_momentum_buffer: Tensor, # (12, 768, 1) or (12, 1, 3072) - factored second moment
-    momentum_t: Tensor,             # () - 0-D CPU tensor, momentum coefficient
-    lr_t: Tensor,                   # () - 0-D CPU tensor, learning rate
-    wd_t: Tensor,                   # () - 0-D CPU tensor, weight decay
-    beta2_t: Tensor,                # () - 0-D CPU tensor, beta2 for second moment
+    momentum_t: Tensor,             # () - 0-D tensor, momentum coefficient
+    lr_t: Tensor,                   # () - 0-D tensor, learning rate
+    wd_t: Tensor,                   # () - 0-D tensor, weight decay
+    beta2_t: Tensor,                # () - 0-D tensor, beta2 for second moment
     ns_steps: int,                  # 5 - number of Newton-Schulz/Polar Express iterations
     red_dim: int,                   # -1 or -2 - reduction dimension for variance
 ) -> None:
@@ -177,19 +177,22 @@ class MuonAdamW(torch.optim.Optimizer):
     """
     def __init__(self, param_groups: list[dict]):
         super().__init__(param_groups, defaults={})
-        # 0-D CPU tensors to avoid torch.compile recompilation when values change
+        # Detect device from the first parameter
+        device = next(p for group in param_groups for p in group['params']).device
+        # 0-D tensors to avoid torch.compile recompilation when values change
+        # (using tensor objects rather than Python scalars is the key; device doesn't matter for compile)
         # AdamW tensors
-        self._adamw_step_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_lr_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_beta1_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_beta2_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_eps_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_wd_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
+        self._adamw_step_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_lr_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_beta1_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_beta2_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_eps_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_wd_t = torch.tensor(0.0, dtype=torch.float32, device=device)
         # Muon tensors
-        self._muon_momentum_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_lr_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_wd_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_beta2_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
+        self._muon_momentum_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_lr_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_wd_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_beta2_t = torch.tensor(0.0, dtype=torch.float32, device=device)
 
     def _step_adamw(self, group: dict) -> None:
         """
@@ -354,17 +357,19 @@ class DistMuonAdamW(torch.optim.Optimizer):
     """
     def __init__(self, param_groups: list[dict]):
         super().__init__(param_groups, defaults={})
-        # 0-D CPU tensors to avoid torch.compile recompilation when values change
-        self._adamw_step_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_lr_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_beta1_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_beta2_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_eps_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._adamw_wd_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_momentum_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_lr_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_wd_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
-        self._muon_beta2_t = torch.tensor(0.0, dtype=torch.float32, device="cpu")
+        # Detect device from the first parameter
+        device = next(p for group in param_groups for p in group['params']).device
+        # 0-D tensors to avoid torch.compile recompilation when values change
+        self._adamw_step_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_lr_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_beta1_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_beta2_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_eps_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._adamw_wd_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_momentum_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_lr_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_wd_t = torch.tensor(0.0, dtype=torch.float32, device=device)
+        self._muon_beta2_t = torch.tensor(0.0, dtype=torch.float32, device=device)
 
     def _reduce_adamw(self, group: dict, world_size: int) -> dict:
         """Launch async reduce ops for AdamW group. Returns info dict with per-param infos."""
